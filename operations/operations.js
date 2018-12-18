@@ -25,7 +25,9 @@ export class Operations {
                     categoryType,
                     location,
                     comment,
-                    images: obj.images
+                    images: obj.images,
+                    createdTime: new Date().getTime(),
+                    updatedTime: new Date().getTime()
                 }, (err, data) => {
                     if (err) CommonJs.close(client, CommonJSInstance.ERROR, err, cb);
                     else CommonJs.close(client, CommonJSInstance.SUCCESS, data.ops[0], cb);
