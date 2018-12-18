@@ -36,6 +36,7 @@ router.post('/postReport', (req, res, next) =>
     }),
     (req, res) => CommonJs.validate("postReport", req.body, (status, emptyKeys) => {
         if (status) {
+            req.body.location = typeof req.body.location === "string" ? JSON.parse(req.body.location) : req.body.location;
             Operations.postReport(req.body, (status, response) => {
                 CommonJs.httpResponse(req, res, status, response);
             });
