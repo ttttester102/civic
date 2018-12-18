@@ -1,0 +1,194 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require('../app');
+var debug = require('debug')('lawyerup_server:server');
+var http = require('http');
+import SocketIO from 'socket.io';
+import { Operations } from '../operations/operations.js';
+import { CommonJs } from '../operations/common.js';
+
+/**
+ * Get port from environment and store in Express.
+ */
+
+var port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**
+ * Create HTTP server.
+ */
+
+var server = http.createServer(app);
+let io = SocketIO(server);
+var CommonJsInstance = new CommonJs();
+
+/**
+ * --------------------------------------------------------------------------------------------
+ * --------------------------------------------------------------------------------------------
+ * --------------------------------------------------------------------------------------------
+ * Socekt implementation start
+ * --------------------------------------------------------------------------------------------
+ * --------------------------------------------------------------------------------------------
+ * --------------------------------------------------------------------------------------------
+ */
+var clients = [];
+io.sockets.on('connection', function (socket) {
+
+  /**
+   * On user connection
+   */
+  socket.on('user connection', (data) => {
+    socket.id = data.chatSenderUser;
+    clients.push(socket.id);
+    clients = Array.from(new Set(clients));
+    console.log(clients);
+    io.emit('chat users update', { connectedUsers: clients });
+  });
+
+  socket.on('getUnreadAndDeniedBookingsForLawyer', (data) => {
+    console.log('data', data);
+    
+    CommonJs.validate("getUnreadAndDeniedBookingsForLawyer", data, (status, emptyKeys) => {
+      if (status) {
+        Operations.getUnreadAndDeniedBookingsForLawyer(data, (status, response) => io.emit('responseUnreadAndDeniedBookingsForLawyer', CommonJs.mergeObject({ userId: data.lawyerId }, CommonJs.socketResponse(status, response))));
+      } else io.emit('responseUnreadAndDeniedBookingsForLawyer', CommonJs.mergeObject({ userId: data.lawyerId }, CommonJs.socketResponse(status, response)));
+    });
+  });
+
+  /** Mark as read booking request */
+  socket.on('markAsViewedBookingRequestByLawyer', (data) => {
+    CommonJs.validate("markAsViewedBookingRequestByLawyer", data, (status, emptyKeys) => {
+      if (status) {
+        Operations.markAsViewedBookingRequestByLawyer(data, (status, response) => io.emit('responseOfMarkAsViewedBookingRequestByLawyer', CommonJs.mergeObject({ userId: data.id }, CommonJs.socketResponse(status, response))));
+      } else io.emit('responseOfMarkAsViewedBookingRequestByLawyer', CommonJs.mergeObject({ userId: data.id }, CommonJs.socketResponse(status, response)));
+    });
+  });
+
+  /** Get all unread accepted and denyied bookings for client */
+  socket.on('getUnreadAndDeniedBookingsForClient', (data) => {
+    console.log('data', data);
+    
+    CommonJs.validate("getUnreadAndDeniedBookingsForClient", data, (status, emptyKeys) => {
+      if (status) {
+        Operations.getUnreadAndDeniedBookingsForClient(data, (status, response) => io.emit('responseUnreadAndDeniedBookingsForClient', CommonJs.mergeObject({ userId: data.clientId }, CommonJs.socketResponse(status, response))));
+      } else io.emit('responseUnreadAndDeniedBookingsForClient', CommonJs.mergeObject({ userId: data.clientId }, CommonJs.socketResponse(status, response)));
+    });
+  });
+
+  /** Mark as read booking request */
+  socket.on('markAsViewedBookingRequestByClient', (data) => {
+    CommonJs.validate("markAsViewedBookingRequestByClient", data, (status, emptyKeys) => {
+      if (status) {
+        Operations.markAsViewedBookingRequestByClient(data, (status, response) => io.emit('responseOfMarkAsViewedBookingRequestByClient', CommonJs.mergeObject({ userId: data.id }, CommonJs.socketResponse(status, response))));
+      } else io.emit('responseOfMarkAsViewedBookingRequestByClient', CommonJs.mergeObject({ userId: data.id }, CommonJs.socketResponse(status, response)));
+    });
+  });
+
+  /** Mark as viewed deny booking */
+  socket.on('markAsViewedDenyBooking', (data) => {
+    CommonJs.validate("markAsViewedDenyBooking", data, (status, emptyKeys) => {
+      if (status) {
+        Operations.markAsViewedDenyBooking(data, (status, response) => io.emit('responseOfMarkAsViewedDenyBooking', CommonJs.mergeObject({ userId: data.id }, CommonJs.socketResponse(status, response))));
+      } else io.emit('responseOfMarkAsViewedDenyBooking', CommonJs.mergeObject({ userId: data.id }, CommonJs.socketResponse(status, response)));
+    });
+  });
+
+  socket.on('get message', (data) => {
+    Operations.getAllMessages(data, (status, response) => {
+      switch (status) {
+        case 'success':
+          response.sort((a, b) => {
+            return a.time > b.time;
+          });
+
+          io.emit('chat message', response);
+          break;
+        case 'err':
+          break;
+        default:
+      }
+    });
+  });
+})
+
+/**
+ * --------------------------------------------------------------------------------------------
+ * --------------------------------------------------------------------------------------------
+ * --------------------------------------------------------------------------------------------
+ * Socket End
+ * --------------------------------------------------------------------------------------------
+ * --------------------------------------------------------------------------------------------
+ * --------------------------------------------------------------------------------------------
+ */
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+server.listen(port);
+server.on('error', onError);
+server.on('listening', onListening);
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  debug('Listening on ' + bind);
+}
